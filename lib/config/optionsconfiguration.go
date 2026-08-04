@@ -77,8 +77,10 @@ type OptionsConfiguration struct {
 	ConnectionLimitMax                 int `json:"connectionLimitMax" xml:"connectionLimitMax"`
 	ConnectionPriorityTCPLAN           int `json:"connectionPriorityTcpLan" xml:"connectionPriorityTcpLan" default:"10"`
 	ConnectionPriorityQUICLAN          int `json:"connectionPriorityQuicLan" xml:"connectionPriorityQuicLan" default:"20"`
+	ConnectionPriorityGarlicLAN        int `json:"connectionPriorityGarlicLan" xml:"connectionPriorityGarlicLan" default:"50"`
 	ConnectionPriorityTCPWAN           int `json:"connectionPriorityTcpWan" xml:"connectionPriorityTcpWan" default:"30"`
 	ConnectionPriorityQUICWAN          int `json:"connectionPriorityQuicWan" xml:"connectionPriorityQuicWan" default:"40"`
+	ConnectionPriorityGarlicWAN        int `json:"connectionPriorityGarlicWan" xml:"connectionPriorityGarlicWan" default:"10"`
 	ConnectionPriorityRelay            int `json:"connectionPriorityRelay" xml:"connectionPriorityRelay" default:"50"`
 	ConnectionPriorityUpgradeThreshold int `json:"connectionPriorityUpgradeThreshold" xml:"connectionPriorityUpgradeThreshold" default:"0"`
 	// Legacy deprecated

@@ -42,6 +42,8 @@ var (
 	DefaultTCPPort = 22000
 	// DefaultQUICPort defines default QUIC port used if the URI does not specify one, for example quic://0.0.0.0
 	DefaultQUICPort = 22000
+	// DefaultGarlicPort defines default Garlic port used if the URI does not specify one, for example garlic://0.0.0.0
+	DefaultGarlicPort = 22000
 	// DefaultListenAddresses should be substituted when the configuration
 	// contains <listenAddress>default</listenAddress>. This is done by the
 	// "consumer" of the configuration as we don't want these saved to the
@@ -664,7 +666,7 @@ func (defaults *Defaults) prepare(myID protocol.DeviceID, existingDevices map[pr
 	defaults.Device.prepare(nil)
 }
 
-func ensureZeroForNodefault(empty interface{}, target interface{}) {
+func ensureZeroForNodefault(empty, target interface{}) {
 	copyMatchingTag(empty, target, "nodefault", func(v string) bool {
 		if len(v) > 0 && v != "true" {
 			panic(fmt.Sprintf(`unexpected tag value: %s. expected untagged or "true"`, v))
@@ -674,7 +676,7 @@ func ensureZeroForNodefault(empty interface{}, target interface{}) {
 }
 
 // copyMatchingTag copies fields tagged tag:"value" from "from" struct onto "to" struct.
-func copyMatchingTag(from interface{}, to interface{}, tag string, shouldCopy func(value string) bool) {
+func copyMatchingTag(from, to interface{}, tag string, shouldCopy func(value string) bool) {
 	fromStruct := reflect.ValueOf(from).Elem()
 	fromType := fromStruct.Type()
 
