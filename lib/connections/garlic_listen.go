@@ -149,13 +149,14 @@ func (t *garlicListener) URI() *url.URL {
 }
 
 func (t *garlicListener) WANAddresses() []*url.URL {
-	addrs := []*url.URL{}
-	return addrs
+	if t.URI() != nil {
+		return []*url.URL{t.URI()}
+	}
+	return nil
 }
 
 func (t *garlicListener) LANAddresses() []*url.URL {
-	addrs := []*url.URL{}
-	return addrs
+	return nil // I2P has no LAN concept
 }
 
 func (t *garlicListener) String() string {
@@ -186,6 +187,7 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 	}
 	listener, err := f.Garlic.Listen()
 	if err != nil {
+		f.invalidated = err
 		l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
 	}
 	var listenerURI *url.URL
