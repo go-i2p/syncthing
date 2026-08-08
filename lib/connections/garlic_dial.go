@@ -48,9 +48,11 @@ func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.U
 		return internalConn{}, err
 	}
 
-	err = dialer.SetTrafficClass(conn, d.trafficClass)
-	if err != nil {
-		l.Debugln("Dial (garlic): setting traffic class:", err)
+	// Apply traffic class if configured (matching listener behavior)
+	if tc := d.trafficClass; tc != 0 {
+		if err := dialer.SetTrafficClass(conn, tc); err != nil {
+			l.Debugln("Dial (garlic): setting traffic class:", err)
+		}
 	}
 
 	tc := tls.Client(conn, d.tlsCfg)

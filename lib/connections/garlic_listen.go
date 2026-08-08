@@ -52,25 +52,43 @@ type garlicListener struct {
 }
 
 func (t *garlicListener) serve(ctx context.Context) error {
-	gaddr, err := i2pkeys.Lookup(t.uri.Host)
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
-		return err
-	}
+	var gaddr *i2pkeys.I2PAddr
+	var listener net.Listener
 
-	lc := net.ListenConfig{
-		Control: dialer.ReusePortControl,
-	}
+	// Use the listener created by the factory (stored in t.listener)
+	if t.listener == nil {
+		// Fallback: look up address and create listener if factory didn't create one
+		var err error
+		gaddr, err = i2pkeys.Lookup(t.uri.Host)
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
+			return err
+		}
 
-	listener, err := lc.Listen(context.TODO(), t.uri.Scheme, gaddr.String())
-	if err != nil {
-		slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
-		return err
-	}
-	defer listener.Close()
+		lc := net.ListenConfig{
+			Control: dialer.ReusePortControl,
+		}
 
-	// We might bind to :0, so use the port we've been given.
-	gaddr = listener.Addr().(*i2pkeys.I2PAddr)
+		listener, err = lc.Listen(context.TODO(), t.uri.Scheme, gaddr.String())
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
+			return err
+		}
+		defer listener.Close()
+
+		// We might bind to :0, so use the port we've been given.
+		gaddr = listener.Addr().(*i2pkeys.I2PAddr)
+		t.listener = listener
+	} else {
+		// Use the factory-created listener
+		gaddr = t.listener.Addr().(*i2pkeys.I2PAddr)
+		listener = t.listener
+		// Update URI in case the bound address differs from what we looked up
+		t.uri = &url.URL{
+			Scheme: "garlic",
+			Host:   gaddr.String(),
+		}
+	}
 
 	t.notifyAddressesChanged(t)
 	defer t.clearAddresses(t)
