@@ -38,11 +38,12 @@ func (d *garlicDialer) DialContext(ctx context.Context, network, addr string) (n
 }
 
 func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.URL) (internalConn, error) {
-	uri = fixupPort(uri, config.DefaultGarlicPort)
+	// For I2P, we don't want a port in the address passed to the SAM API.
+	host := uri.Hostname()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := d.DialContext(timeoutCtx, uri.Scheme, uri.Host)
+	conn, err := d.DialContext(timeoutCtx, uri.Scheme, host)
 	if err != nil {
 		return internalConn{}, err
 	}

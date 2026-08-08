@@ -138,15 +138,12 @@ func (t *garlicListener) serve(ctx context.Context) error {
 }
 
 func (t *garlicListener) URI() *url.URL {
-	// craft the URL from the listener
 	if t.listener != nil {
-		host := fmt.Sprintf("%s:%s", t.listener.Addr().String(), config.DefaultGarlicPort)
-		scheme := "garlic"
-		uri := &url.URL{
-			Scheme: scheme,
-			Host:   host,
+		i2pAddr := t.listener.Addr().(*i2pkeys.I2PAddr)
+		return &url.URL{
+			Scheme: "garlic",
+			Host:   i2pAddr.String(),
 		}
-		return uri
 	}
 	return nil
 }
@@ -191,11 +188,18 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 	if err != nil {
 		l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
 	}
-	// Likely design:
-	// URL must be nil, we compute it from the listener.
-	// No nat.Service, NAT traversal is handled by I2P
+	var listenerURI *url.URL
+	if listener != nil {
+		// Get the I2P address from the listener
+		i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
+		host := i2pAddr.String()
+		listenerURI = &url.URL{
+			Scheme: "garlic",
+			Host:   host,
+		}
+	}
 	l := &garlicListener{
-		uri:      fixupPort(uri, config.DefaultGarlicPort),
+		uri:      listenerURI,
 		cfg:      cfg,
 		tlsCfg:   tlsCfg,
 		conns:    conns,
