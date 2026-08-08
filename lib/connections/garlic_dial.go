@@ -60,10 +60,7 @@ func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.U
 	}
 
 	priority := d.wanPriority
-	isLocal := d.lanChecker.isLAN(conn.RemoteAddr())
-	if isLocal {
-		priority = d.lanPriority
-	}
+	isLocal := false
 
 	return newInternalConn(tc, connTypeGarlicClient, isLocal, priority), nil
 }

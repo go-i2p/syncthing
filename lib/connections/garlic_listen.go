@@ -9,14 +9,20 @@ package connections
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"sync"
+	"time"
 
+	"github.com/go-i2p/i2pkeys"
 	"github.com/go-i2p/onramp"
+	"github.com/syncthing/syncthing/internal/slogutil"
 	"github.com/syncthing/syncthing/lib/config"
 	"github.com/syncthing/syncthing/lib/connections/registry"
+	"github.com/syncthing/syncthing/lib/dialer"
 	"github.com/syncthing/syncthing/lib/nat"
 	"github.com/syncthing/syncthing/lib/svcutil"
 )
@@ -32,12 +38,12 @@ type garlicListener struct {
 	svcutil.ServiceWithError
 	onAddressesChangedNotifier
 
-	uri     *url.URL
-	cfg     config.Wrapper
-	tlsCfg  *tls.Config
-	conns   chan internalConn
-	factory listenerFactory
-	//registry *registry.Registry
+	uri      *url.URL
+	cfg      config.Wrapper
+	tlsCfg   *tls.Config
+	conns    chan internalConn
+	factory  listenerFactory
+	registry *registry.Registry
 
 	// laddr net.Addr
 	listener net.Listener
@@ -46,7 +52,89 @@ type garlicListener struct {
 }
 
 func (t *garlicListener) serve(ctx context.Context) error {
-	return nil
+	gaddr, err := i2pkeys.Lookup(t.uri.Host)
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
+		return err
+	}
+
+	lc := net.ListenConfig{
+		Control: dialer.ReusePortControl,
+	}
+
+	listener, err := lc.Listen(context.TODO(), t.uri.Scheme, gaddr.String())
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
+		return err
+	}
+	defer listener.Close()
+
+	// We might bind to :0, so use the port we've been given.
+	gaddr = listener.Addr().(*i2pkeys.I2PAddr)
+
+	t.notifyAddressesChanged(t)
+	defer t.clearAddresses(t)
+
+	t.registry.Register(t.uri.Scheme, gaddr)
+	defer t.registry.Unregister(t.uri.Scheme, gaddr)
+
+	slog.InfoContext(ctx, "Garlic listener starting", slogutil.Address(gaddr))
+	defer slog.InfoContext(ctx, "Garlic listener shutting down", slogutil.Address(gaddr))
+
+	acceptFailures := 0
+	const maxAcceptFailures = 10
+
+	// :(, but what can you do.
+	//tcpListener := listener.(*)
+
+	for {
+		conn, err := listener.Accept()
+		select {
+		case <-ctx.Done():
+			if err == nil {
+				conn.Close()
+			}
+			return nil
+		default:
+		}
+		if err != nil {
+			var ne *net.OpError
+			if ok := errors.As(err, &ne); !ok || !ne.Timeout() {
+				slog.WarnContext(ctx, "Failed to accept Garlic connection", slogutil.Error(err))
+
+				acceptFailures++
+				if acceptFailures > maxAcceptFailures {
+					// Return to restart the listener, because something
+					// seems permanently damaged.
+					return err
+				}
+
+				// Slightly increased delay for each failure.
+				time.Sleep(time.Duration(acceptFailures) * time.Second)
+			}
+			continue
+		}
+
+		acceptFailures = 0
+		l.Debugln("Listen (Garlic): connect from", conn.RemoteAddr())
+
+		if tc := t.cfg.Options().TrafficClass; tc != 0 {
+			if err := dialer.SetTrafficClass(conn, tc); err != nil {
+				l.Debugln("Listen (Garlic): setting traffic class:", err)
+			}
+		}
+
+		tc := tls.Server(conn, t.tlsCfg)
+		if err := tlsTimedHandshake(tc); err != nil {
+			slog.WarnContext(ctx, "Failed TLS handshake", slogutil.Address(tc.RemoteAddr()), slogutil.Error(err))
+			tc.Close()
+			continue
+		}
+
+		priority := t.cfg.Options().ConnectionPriorityGarlicWAN
+		isLocal := false
+		t.conns <- newInternalConn(tc, connTypeGarlicServer, isLocal, priority)
+	}
 }
 
 func (t *garlicListener) URI() *url.URL {
@@ -105,16 +193,15 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 	}
 	// Likely design:
 	// URL must be nil, we compute it from the listener.
-	// tls.Config must not verify keys, we have to use self-signed TLS.
 	// No nat.Service, NAT traversal is handled by I2P
-	// No registry, in the I2P context it will be counterproductive
 	l := &garlicListener{
-		uri:      fixupPort(uri, config.DefaultTCPPort),
+		uri:      fixupPort(uri, config.DefaultGarlicPort),
 		cfg:      cfg,
 		tlsCfg:   tlsCfg,
 		conns:    conns,
 		factory:  f,
 		listener: listener,
+		registry: registry,
 	}
 	l.ServiceWithError = svcutil.AsService(l.serve, l.String())
 	return l
@@ -122,7 +209,10 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 
 func (f *garlicListenerFactory) Valid(_ config.Configuration) error {
 	// Garlic must not be nil
-	// Garlic must not be closed
+	if f.Garlic == nil {
+		return fmt.Errorf("Garlic is nil, garlicListenerFactory was not instantiated: %s", f.invalidated)
+	}
+	// Garlic setup failed earlier and the transport was invalidated
 	if f.invalidated != nil {
 		return f.invalidated
 	}
