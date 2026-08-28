@@ -83,6 +83,8 @@ type OptionsConfiguration struct {
 	ConnectionPriorityGarlicWAN        int `json:"connectionPriorityGarlicWan" xml:"connectionPriorityGarlicWan" default:"10"`
 	ConnectionPriorityRelay            int `json:"connectionPriorityRelay" xml:"connectionPriorityRelay" default:"50"`
 	ConnectionPriorityUpgradeThreshold int `json:"connectionPriorityUpgradeThreshold" xml:"connectionPriorityUpgradeThreshold" default:"0"`
+	// I2P mode: "mixed" (TCP/QUIC + I2P), "i2p-only" (I2P only), or "disabled"
+	I2PMode string `json:"i2pMode" xml:"i2pMode" default:"mixed"`
 	// Legacy deprecated
 	DeprecatedUPnPEnabled        bool     `json:"-" xml:"upnpEnabled,omitempty"`        // Deprecated: Do not use.
 	DeprecatedUPnPLeaseM         int      `json:"-" xml:"upnpLeaseMinutes,omitempty"`   // Deprecated: Do not use.

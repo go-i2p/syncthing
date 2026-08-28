@@ -9,6 +9,7 @@ package connections
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/url"
 	"time"
@@ -34,6 +35,9 @@ type garlicDialer struct {
 }
 
 func (d *garlicDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	if d.garlic == nil {
+		return nil, fmt.Errorf("garlic dialer not initialized (SAM unavailable)")
+	}
 	return d.garlic.DialContext(ctx, network, addr)
 }
 
@@ -75,9 +79,20 @@ type garlicDialerFactory struct {
 func (g *garlicDialerFactory) New(opts config.OptionsConfiguration, tlsCfg *tls.Config, registry *registry.Registry, lanChecker *lanChecker) genericDialer {
 	garlic, err := onramp.NewGarlic("syncthing-dial", onramp.SAM_ADDR, onramp.OPT_WIDE)
 	if err != nil {
-		// TODO: learn syncthing's standard logging practices and implement them here
 		l.Debugln("Failed to create garlic dialer:", err)
 		g.invalidated = err
+		return &garlicDialer{
+			commonDialer: commonDialer{
+				trafficClass:      opts.TrafficClass,
+				reconnectInterval: time.Duration(opts.ReconnectIntervalS) * time.Second,
+				tlsCfg:            tlsCfg,
+				lanChecker:        lanChecker,
+				lanPriority:       opts.ConnectionPriorityGarlicLAN,
+				wanPriority:       opts.ConnectionPriorityGarlicWAN,
+				allowsMultiConns:  true,
+			},
+			garlic: nil,
+		}
 	}
 	return &garlicDialer{
 		commonDialer: commonDialer{

@@ -201,21 +201,37 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 		if err != nil {
 			f.invalidated = err
 			l.Debugf("SAMv3 connection to I2P failed: %s", err)
+			return &garlicListener{
+				uri:      nil,
+				cfg:      cfg,
+				tlsCfg:   tlsCfg,
+				conns:    conns,
+				factory:  f,
+				listener: nil,
+				registry: registry,
+				ServiceWithError: svcutil.AsService(func(ctx context.Context) error {
+					slog.WarnContext(ctx, "Garlic listener disabled: SAM unavailable")
+					<-ctx.Done()
+					return ctx.Err()
+				}, "garlic-disabled"),
+			}
 		}
 	}
-	listener, err := f.Garlic.Listen()
-	if err != nil {
-		f.invalidated = err
-		l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
-	}
+	var listener net.Listener
 	var listenerURI *url.URL
-	if listener != nil {
-		// Get the I2P address from the listener
-		i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
-		host := i2pAddr.String()
-		listenerURI = &url.URL{
-			Scheme: "garlic",
-			Host:   host,
+	if f.invalidated == nil {
+		var err error
+		listener, err = f.Garlic.Listen()
+		if err != nil {
+			f.invalidated = err
+			l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
+		} else if listener != nil {
+			i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
+			host := i2pAddr.String()
+			listenerURI = &url.URL{
+				Scheme: "garlic",
+				Host:   host,
+			}
 		}
 	}
 	l := &garlicListener{
