@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-i2p/onramp"
@@ -45,12 +46,16 @@ func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.U
 	if uri == nil {
 		return internalConn{}, fmt.Errorf("garlic dialer: nil URI")
 	}
-	// For I2P, we don't want a port in the address passed to the SAM API.
-	host := uri.Hostname()
+	// For I2P, addresses are cryptographic hashes; we pass the full host
+	// (without port) to the SAM API. There is never a configured hostname.
+	host := uri.Host
+	if colon := strings.LastIndex(host, ":"); colon != -1 {
+		host = host[:colon]
+	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := d.DialContext(timeoutCtx, "tcp", host)
+	conn, err := d.DialContext(timeoutCtx, "garlic", host)
 	if err != nil {
 		return internalConn{}, err
 	}
