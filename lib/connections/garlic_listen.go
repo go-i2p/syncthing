@@ -54,6 +54,7 @@ type garlicListener struct {
 func (t *garlicListener) serve(ctx context.Context) error {
 	var gaddr *i2pkeys.I2PAddr
 	var listener net.Listener
+	var listenerURI *url.URL
 
 	// Use the listener created by the factory (stored in t.listener)
 	if t.listener == nil {
@@ -69,21 +70,24 @@ func (t *garlicListener) serve(ctx context.Context) error {
 			return err
 		}
 
-		lc := net.ListenConfig{
-			Control: dialer.ReusePortControl,
-		}
-
-		listener, err = lc.Listen(ctx, "tcp", gaddr.String())
+		listener, err = t.factory.(*garlicListenerFactory).Garlic.Listen()
 		if err != nil {
-			slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
-			return err
+			return fmt.Errorf("garlic listener: SAM listen failed: %w", err)
 		}
-		defer listener.Close()
-
-		// We might bind to :0, so use the port we've been given.
-		gaddr = listener.Addr().(*i2pkeys.I2PAddr)
+		if listener == nil {
+			return fmt.Errorf("garlic listener: SAM listener is nil")
+		}
 		t.mut.Lock()
 		t.listener = listener
+		t.mut.Unlock()
+		i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
+		gaddr = i2pAddr
+		listenerURI = &url.URL{
+			Scheme: "garlic",
+			Host:   i2pAddr.String(),
+		}
+		t.mut.Lock()
+		t.uri = listenerURI
 		t.mut.Unlock()
 	} else {
 		// Use the factory-created listener
@@ -103,8 +107,8 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	t.notifyAddressesChanged(t)
 	defer t.clearAddresses(t)
 
-	t.registry.Register(t.uri.Scheme, gaddr)
-	defer t.registry.Unregister(t.uri.Scheme, gaddr)
+	t.registry.Register(t.uri.String(), gaddr)
+	defer t.registry.Unregister(t.uri.String(), gaddr)
 
 	slog.InfoContext(ctx, "Garlic listener starting", slogutil.Address(gaddr))
 	defer slog.InfoContext(ctx, "Garlic listener shutting down", slogutil.Address(gaddr))
@@ -166,12 +170,20 @@ func (t *garlicListener) serve(ctx context.Context) error {
 }
 
 func (t *garlicListener) URI() *url.URL {
+	t.mut.RLock()
+	defer t.mut.RUnlock()
 	if t.listener != nil {
-		i2pAddr := t.listener.Addr().(*i2pkeys.I2PAddr)
-		return &url.URL{
-			Scheme: "garlic",
-			Host:   i2pAddr.String(),
+		if addr := t.listener.Addr(); addr != nil {
+			if i2pAddr, ok := addr.(*i2pkeys.I2PAddr); ok {
+				return &url.URL{
+					Scheme: "garlic",
+					Host:   i2pAddr.String(),
+				}
+			}
 		}
+	}
+	if t.uri != nil {
+		return t.uri
 	}
 	return nil
 }

@@ -1031,6 +1031,16 @@ func (s *service) NATType() string {
 }
 
 func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, error) {
+	switch cfg.Options.I2PMode {
+	case "i2p-only":
+		if !strings.HasPrefix(uri.Scheme, "garlic") {
+			return nil, fmt.Errorf("%w: I2P-only mode excludes %s", errDisabled, uri.Scheme)
+		}
+	case "disabled":
+		if strings.HasPrefix(uri.Scheme, "garlic") {
+			return nil, fmt.Errorf("%w: I2P disabled excludes %s", errDisabled, uri.Scheme)
+		}
+	}
 	dialerFactory, ok := dialers[uri.Scheme]
 	if !ok {
 		return nil, fmt.Errorf("unknown address scheme %q", uri.Scheme)
@@ -1043,6 +1053,16 @@ func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, er
 }
 
 func getListenerFactory(cfg config.Configuration, uri *url.URL) (listenerFactory, error) {
+	switch cfg.Options.I2PMode {
+	case "i2p-only":
+		if !strings.HasPrefix(uri.Scheme, "garlic") {
+			return nil, fmt.Errorf("%w: I2P-only mode excludes %s", errDisabled, uri.Scheme)
+		}
+	case "disabled":
+		if strings.HasPrefix(uri.Scheme, "garlic") {
+			return nil, fmt.Errorf("%w: I2P disabled excludes %s", errDisabled, uri.Scheme)
+		}
+	}
 	listenerFactory, ok := listeners[uri.Scheme]
 	if !ok {
 		return nil, fmt.Errorf("unknown address scheme %q", uri.Scheme)
