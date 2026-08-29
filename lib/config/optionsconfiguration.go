@@ -78,10 +78,10 @@ type OptionsConfiguration struct {
 	ConnectionLimitMax                 int `json:"connectionLimitMax" xml:"connectionLimitMax"`
 	ConnectionPriorityTCPLAN           int `json:"connectionPriorityTcpLan" xml:"connectionPriorityTcpLan" default:"10"`
 	ConnectionPriorityQUICLAN          int `json:"connectionPriorityQuicLan" xml:"connectionPriorityQuicLan" default:"20"`
-	ConnectionPriorityGarlicLAN        int `json:"connectionPriorityGarlicLan" xml:"connectionPriorityGarlicLan" default:"50"`
+	ConnectionPriorityGarlicLAN        int `json:"connectionPriorityGarlicLan" xml:"connectionPriorityGarlicLan" default:"30"`
 	ConnectionPriorityTCPWAN           int `json:"connectionPriorityTcpWan" xml:"connectionPriorityTcpWan" default:"30"`
 	ConnectionPriorityQUICWAN          int `json:"connectionPriorityQuicWan" xml:"connectionPriorityQuicWan" default:"40"`
-	ConnectionPriorityGarlicWAN        int `json:"connectionPriorityGarlicWan" xml:"connectionPriorityGarlicWan" default:"10"`
+	ConnectionPriorityGarlicWAN        int `json:"connectionPriorityGarlicWan" xml:"connectionPriorityGarlicWan" default:"50"`
 	ConnectionPriorityRelay            int `json:"connectionPriorityRelay" xml:"connectionPriorityRelay" default:"50"`
 	ConnectionPriorityUpgradeThreshold int `json:"connectionPriorityUpgradeThreshold" xml:"connectionPriorityUpgradeThreshold" default:"0"`
 	// I2P mode: "mixed" (TCP/QUIC + I2P), "i2p-only" (I2P only), or "disabled"
@@ -142,6 +142,9 @@ func (opts *OptionsConfiguration) prepare(guiPWIsSet bool) {
 	}
 	if opts.ConnectionPriorityTCPWAN <= opts.ConnectionPriorityTCPLAN {
 		opts.ConnectionPriorityTCPWAN = opts.ConnectionPriorityTCPLAN + 1
+	}
+	if opts.ConnectionPriorityGarlicWAN <= opts.ConnectionPriorityGarlicLAN {
+		opts.ConnectionPriorityGarlicWAN = opts.ConnectionPriorityGarlicLAN + 1
 	}
 
 	// I2P mode validation

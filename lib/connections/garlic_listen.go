@@ -54,72 +54,43 @@ type garlicListener struct {
 func (t *garlicListener) serve(ctx context.Context) error {
 	var gaddr *i2pkeys.I2PAddr
 	var listener net.Listener
-	var listenerURI *url.URL
 
-	// Use the listener created by the factory (stored in t.listener)
+	// I2P addresses are cryptographic hashes; we cannot listen on a
+	// configured hostname. The factory creates the listener via SAM,
+	// which generates its own I2P address. We rely on that listener.
 	if t.listener == nil {
 		if t.uri == nil || t.uri.Host == "" {
 			slog.WarnContext(ctx, "Garlic listener disabled: no URI configured")
 			return fmt.Errorf("garlic listener has no URI")
 		}
-		// Fallback: look up address and create listener if factory didn't create one
-		var err error
-		gaddr, err = i2pkeys.Lookup(t.uri.Host)
-		if err != nil {
-			slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
-			return err
-		}
-
-		listener, err = t.factory.(*garlicListenerFactory).Garlic.Listen()
-		if err != nil {
-			return fmt.Errorf("garlic listener: SAM listen failed: %w", err)
-		}
-		if listener == nil {
-			return fmt.Errorf("garlic listener: SAM listener is nil")
-		}
-		t.mut.Lock()
-		t.listener = listener
-		t.mut.Unlock()
-		i2pAddr, ok := listener.Addr().(*i2pkeys.I2PAddr)
-		if !ok {
-			slog.WarnContext(ctx, "Garlic listener address is not I2PAddr", slogutil.Address(listener.Addr()))
-			return fmt.Errorf("garlic listener: unexpected address type %T", listener.Addr())
-		}
-		gaddr = i2pAddr
-		listenerURI = &url.URL{
-			Scheme: "garlic",
-			Host:   i2pAddr.String(),
-		}
-		t.mut.Lock()
-		t.uri = listenerURI
-		t.mut.Unlock()
-	} else {
-		// Use the factory-created listener
-		t.mut.RLock()
-		listener = t.listener
-		t.mut.RUnlock()
-		if listener == nil {
-			slog.WarnContext(ctx, "Garlic listener disabled: factory listener is nil")
-			return fmt.Errorf("garlic listener: factory listener is nil")
-		}
-		addr := listener.Addr()
-		if addr == nil {
-			slog.WarnContext(ctx, "Garlic listener disabled: listener has no address")
-			return fmt.Errorf("garlic listener: listener has no address")
-		}
-		i2pAddr, ok := addr.(*i2pkeys.I2PAddr)
-		if !ok {
-			slog.WarnContext(ctx, "Garlic listener address is not I2PAddr", slogutil.Address(addr))
-			return fmt.Errorf("garlic listener: unexpected address type %T", addr)
-		}
-		gaddr = i2pAddr
-		t.mut.Lock()
-		t.uri = &url.URL{
-			Scheme: "garlic",
-			Host:   gaddr.String(),
-		}
-		t.mut.Unlock()
+		return fmt.Errorf("garlic listener: factory did not create a listener")
 	}
+
+	// Use the factory-created listener (SAM generates its own I2P address)
+	t.mut.RLock()
+	listener = t.listener
+	t.mut.RUnlock()
+	if listener == nil {
+		slog.WarnContext(ctx, "Garlic listener disabled: factory listener is nil")
+		return fmt.Errorf("garlic listener: factory listener is nil")
+	}
+	addr := listener.Addr()
+	if addr == nil {
+		slog.WarnContext(ctx, "Garlic listener disabled: listener has no address")
+		return fmt.Errorf("garlic listener: listener has no address")
+	}
+	i2pAddr, ok := addr.(*i2pkeys.I2PAddr)
+	if !ok {
+		slog.WarnContext(ctx, "Garlic listener address is not I2PAddr", slogutil.Address(addr))
+		return fmt.Errorf("garlic listener: unexpected address type %T", addr)
+	}
+	gaddr = i2pAddr
+	t.mut.Lock()
+	t.uri = &url.URL{
+		Scheme: "garlic",
+		Host:   gaddr.String(),
+	}
+	t.mut.Unlock()
 
 	t.notifyAddressesChanged(t)
 	defer t.clearAddresses(t)
