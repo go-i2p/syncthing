@@ -80,7 +80,11 @@ func (t *garlicListener) serve(ctx context.Context) error {
 		t.mut.Lock()
 		t.listener = listener
 		t.mut.Unlock()
-		i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
+		i2pAddr, ok := listener.Addr().(*i2pkeys.I2PAddr)
+		if !ok {
+			slog.WarnContext(ctx, "Garlic listener address is not I2PAddr", slogutil.Address(listener.Addr()))
+			return fmt.Errorf("garlic listener: unexpected address type %T", listener.Addr())
+		}
 		gaddr = i2pAddr
 		listenerURI = &url.URL{
 			Scheme: "garlic",
@@ -92,10 +96,23 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	} else {
 		// Use the factory-created listener
 		t.mut.RLock()
-		gaddr = t.listener.Addr().(*i2pkeys.I2PAddr)
 		listener = t.listener
 		t.mut.RUnlock()
-		// Update URI in case the bound address differs from what we looked up
+		if listener == nil {
+			slog.WarnContext(ctx, "Garlic listener disabled: factory listener is nil")
+			return fmt.Errorf("garlic listener: factory listener is nil")
+		}
+		addr := listener.Addr()
+		if addr == nil {
+			slog.WarnContext(ctx, "Garlic listener disabled: listener has no address")
+			return fmt.Errorf("garlic listener: listener has no address")
+		}
+		i2pAddr, ok := addr.(*i2pkeys.I2PAddr)
+		if !ok {
+			slog.WarnContext(ctx, "Garlic listener address is not I2PAddr", slogutil.Address(addr))
+			return fmt.Errorf("garlic listener: unexpected address type %T", addr)
+		}
+		gaddr = i2pAddr
 		t.mut.Lock()
 		t.uri = &url.URL{
 			Scheme: "garlic",
@@ -117,9 +134,8 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	const maxAcceptFailures = 10
 
 	for {
-		if tcpListener, ok := listener.(*net.TCPListener); ok {
-			_ = tcpListener.SetDeadline(time.Now().Add(time.Second))
-		}
+		// I2P listener is not a TCPListener; SetDeadline doesn't apply.
+		// Rely on ctx cancellation via Accept blocking behavior.
 		conn, err := listener.Accept()
 		select {
 		case <-ctx.Done():
@@ -251,11 +267,16 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 			f.invalidated = err
 			l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
 		} else if listener != nil {
-			i2pAddr := listener.Addr().(*i2pkeys.I2PAddr)
-			host := i2pAddr.String()
-			listenerURI = &url.URL{
-				Scheme: "garlic",
-				Host:   host,
+			i2pAddr, ok := listener.Addr().(*i2pkeys.I2PAddr)
+			if !ok {
+				f.invalidated = fmt.Errorf("garlic listener: unexpected address type %T", listener.Addr())
+				l.Debugf("SAMv3 Listener setup failed, unexpected address type: %v", f.invalidated)
+			} else {
+				host := i2pAddr.String()
+				listenerURI = &url.URL{
+					Scheme: "garlic",
+					Host:   host,
+				}
 			}
 		}
 	}
