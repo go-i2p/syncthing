@@ -57,6 +57,10 @@ func (t *garlicListener) serve(ctx context.Context) error {
 
 	// Use the listener created by the factory (stored in t.listener)
 	if t.listener == nil {
+		if t.uri == nil || t.uri.Host == "" {
+			slog.WarnContext(ctx, "Garlic listener disabled: no URI configured")
+			return fmt.Errorf("garlic listener has no URI")
+		}
 		// Fallback: look up address and create listener if factory didn't create one
 		var err error
 		gaddr, err = i2pkeys.Lookup(t.uri.Host)
@@ -69,7 +73,7 @@ func (t *garlicListener) serve(ctx context.Context) error {
 			Control: dialer.ReusePortControl,
 		}
 
-		listener, err = lc.Listen(context.TODO(), t.uri.Scheme, gaddr.String())
+		listener, err = lc.Listen(ctx, "tcp", gaddr.String())
 		if err != nil {
 			slog.WarnContext(ctx, "Failed to listen (Garlic)", slogutil.Error(err))
 			return err
@@ -78,16 +82,22 @@ func (t *garlicListener) serve(ctx context.Context) error {
 
 		// We might bind to :0, so use the port we've been given.
 		gaddr = listener.Addr().(*i2pkeys.I2PAddr)
+		t.mut.Lock()
 		t.listener = listener
+		t.mut.Unlock()
 	} else {
 		// Use the factory-created listener
+		t.mut.RLock()
 		gaddr = t.listener.Addr().(*i2pkeys.I2PAddr)
 		listener = t.listener
+		t.mut.RUnlock()
 		// Update URI in case the bound address differs from what we looked up
+		t.mut.Lock()
 		t.uri = &url.URL{
 			Scheme: "garlic",
 			Host:   gaddr.String(),
 		}
+		t.mut.Unlock()
 	}
 
 	t.notifyAddressesChanged(t)
@@ -101,9 +111,6 @@ func (t *garlicListener) serve(ctx context.Context) error {
 
 	acceptFailures := 0
 	const maxAcceptFailures = 10
-
-	// :(, but what can you do.
-	//tcpListener := listener.(*)
 
 	for {
 		conn, err := listener.Accept()
@@ -178,6 +185,9 @@ func (t *garlicListener) LANAddresses() []*url.URL {
 }
 
 func (t *garlicListener) String() string {
+	if t.uri == nil {
+		return "garlic://disabled"
+	}
 	return t.uri.String()
 }
 

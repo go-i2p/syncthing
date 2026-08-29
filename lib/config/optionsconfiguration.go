@@ -9,6 +9,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"runtime"
 	"slices"
 	"strings"
@@ -143,6 +144,14 @@ func (opts *OptionsConfiguration) prepare(guiPWIsSet bool) {
 		opts.ConnectionPriorityTCPWAN = opts.ConnectionPriorityTCPLAN + 1
 	}
 
+	// I2P mode validation
+	switch opts.I2PMode {
+	case "mixed", "i2p-only", "disabled":
+		// valid
+	default:
+		opts.I2PMode = "mixed"
+	}
+
 	// If usage reporting is enabled we must have a unique ID.
 	if opts.URAccepted > 0 && opts.URUniqueID == "" {
 		opts.URUniqueID = rand.String(8)
@@ -177,6 +186,40 @@ func (opts OptionsConfiguration) ListenAddresses() []string {
 			addresses = append(addresses, addr)
 		}
 	}
+	addresses = stringutil.UniqueTrimmedStrings(addresses)
+
+	// Apply I2P mode filtering
+	switch opts.I2PMode {
+	case "i2p-only":
+		filtered := make([]string, 0, len(addresses))
+		for _, a := range addresses {
+			uri, err := url.Parse(a)
+			if err != nil {
+				filtered = append(filtered, a)
+				continue
+			}
+			if strings.HasPrefix(uri.Scheme, "garlic") {
+				filtered = append(filtered, a)
+			}
+		}
+		addresses = filtered
+	case "disabled":
+		filtered := make([]string, 0, len(addresses))
+		for _, a := range addresses {
+			uri, err := url.Parse(a)
+			if err != nil {
+				filtered = append(filtered, a)
+				continue
+			}
+			if !strings.HasPrefix(uri.Scheme, "garlic") {
+				filtered = append(filtered, a)
+			}
+		}
+		addresses = filtered
+	case "mixed":
+		// keep all (default)
+	}
+
 	return stringutil.UniqueTrimmedStrings(addresses)
 }
 
