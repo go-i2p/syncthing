@@ -113,6 +113,9 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	const maxAcceptFailures = 10
 
 	for {
+		if tcpListener, ok := listener.(*net.TCPListener); ok {
+			_ = tcpListener.SetDeadline(time.Now().Add(time.Second))
+		}
 		conn, err := listener.Accept()
 		select {
 		case <-ctx.Done():

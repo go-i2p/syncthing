@@ -47,7 +47,7 @@ func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.U
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := d.DialContext(timeoutCtx, uri.Scheme, host)
+	conn, err := d.DialContext(timeoutCtx, "tcp", host)
 	if err != nil {
 		return internalConn{}, err
 	}
@@ -68,6 +68,12 @@ func (d *garlicDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.U
 
 	priority := d.wanPriority
 	isLocal := false
+	if d.lanChecker != nil && conn != nil {
+		isLocal = d.lanChecker.isLAN(conn.RemoteAddr())
+		if isLocal {
+			priority = d.lanPriority
+		}
+	}
 
 	return newInternalConn(tc, connTypeGarlicClient, isLocal, priority), nil
 }
