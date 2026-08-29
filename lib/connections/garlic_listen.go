@@ -58,12 +58,7 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	// I2P addresses are cryptographic hashes; we cannot listen on a
 	// configured hostname. The factory creates the listener via SAM,
 	// which generates its own I2P address. We rely on that listener.
-	if t.listener != nil {
-		if t.uri == nil || t.uri.Host == "" {
-			slog.WarnContext(ctx, "Garlic listener disabled: no URI configured")
-			return fmt.Errorf("garlic listener has no URI")
-		}
-	} else {
+	if t.listener == nil {
 		return fmt.Errorf("garlic listener: factory did not create a listener")
 	}
 
