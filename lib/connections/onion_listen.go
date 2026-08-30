@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-i2p/i2pkeys"
 	"github.com/go-i2p/onramp"
 	"github.com/syncthing/syncthing/internal/slogutil"
 	"github.com/syncthing/syncthing/lib/config"
@@ -52,17 +51,14 @@ type onionListener struct {
 }
 
 func (t *onionListener) serve(ctx context.Context) error {
-	var gaddr *i2pkeys.I2PAddr
 	var listener net.Listener
 
-	// I2P addresses are cryptographic hashes; we cannot listen on a
-	// configured hostname. The factory creates the listener via SAM,
-	// which generates its own I2P address. We rely on that listener.
+	// Tor onion listener creates its own .onion address via the Tor client.
 	if t.listener == nil {
 		return fmt.Errorf("onion listener: factory did not create a listener")
 	}
 
-	// Use the factory-created listener (SAM generates its own I2P address)
+	// Use the factory-created listener (Tor generates its own onion address)
 	t.mut.RLock()
 	listener = t.listener
 	t.mut.RUnlock()
@@ -75,33 +71,28 @@ func (t *onionListener) serve(ctx context.Context) error {
 		slog.WarnContext(ctx, "Onion listener disabled: listener has no address")
 		return fmt.Errorf("onion listener: listener has no address")
 	}
-	i2pAddr, ok := addr.(*i2pkeys.I2PAddr)
-	if !ok {
-		slog.WarnContext(ctx, "Onion listener address is not I2PAddr", slogutil.Address(addr))
-		return fmt.Errorf("onion listener: unexpected address type %T", addr)
-	}
-	gaddr = i2pAddr
+	host := addr.String()
 	t.mut.Lock()
 	t.uri = &url.URL{
 		Scheme: "onion",
-		Host:   gaddr.String(),
+		Host:   host,
 	}
 	t.mut.Unlock()
 
 	t.notifyAddressesChanged(t)
 	defer t.clearAddresses(t)
 
-	t.registry.Register(t.uri.String(), gaddr)
-	defer t.registry.Unregister(t.uri.String(), gaddr)
+	t.registry.Register(t.uri.String(), addr)
+	defer t.registry.Unregister(t.uri.String(), addr)
 
-	slog.InfoContext(ctx, "Onion listener starting", slogutil.Address(gaddr))
-	defer slog.InfoContext(ctx, "Onion listener shutting down", slogutil.Address(gaddr))
+	slog.InfoContext(ctx, "Onion listener starting", slogutil.Address(addr))
+	defer slog.InfoContext(ctx, "Onion listener shutting down", slogutil.Address(addr))
 
 	acceptFailures := 0
 	const maxAcceptFailures = 10
 
 	for {
-		// I2P listener is not a TCPListener; SetDeadline doesn't apply.
+		// Tor listener is not a TCPListener; SetDeadline doesn't apply.
 		// Rely on ctx cancellation via Accept blocking behavior.
 		conn, err := listener.Accept()
 		select {
@@ -157,11 +148,10 @@ func (t *onionListener) URI() *url.URL {
 	defer t.mut.RUnlock()
 	if t.listener != nil {
 		if addr := t.listener.Addr(); addr != nil {
-			if i2pAddr, ok := addr.(*i2pkeys.I2PAddr); ok {
-				return &url.URL{
-					Scheme: "onion",
-					Host:   i2pAddr.String(),
-				}
+			host := addr.String()
+			return &url.URL{
+				Scheme: "onion",
+				Host:   host,
 			}
 		}
 	}
@@ -179,7 +169,7 @@ func (t *onionListener) WANAddresses() []*url.URL {
 }
 
 func (t *onionListener) LANAddresses() []*url.URL {
-	return nil // I2P has no LAN concept
+	return nil // Tor has no LAN concept
 }
 
 func (t *onionListener) String() string {
@@ -218,7 +208,7 @@ func (f *onionListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tls
 				listener: nil,
 				registry: registry,
 				ServiceWithError: svcutil.AsService(func(ctx context.Context) error {
-					slog.WarnContext(ctx, "Onion listener disabled: SAM unavailable")
+					slog.WarnContext(ctx, "Onion listener disabled: Tor unavailable")
 					<-ctx.Done()
 					return ctx.Err()
 				}, "onion-disabled"),
@@ -232,18 +222,12 @@ func (f *onionListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tls
 		listener, err = f.Onion.Listen()
 		if err != nil {
 			f.invalidated = err
-			l.Debugf("SAMv3 Listener setup failed, cannot listen on I2P: %s", err)
+			l.Debugf("Tor listener setup failed, cannot listen on onion: %s", err)
 		} else if listener != nil {
-			i2pAddr, ok := listener.Addr().(*i2pkeys.I2PAddr)
-			if !ok {
-				f.invalidated = fmt.Errorf("onion listener: unexpected address type %T", listener.Addr())
-				l.Debugf("SAMv3 Listener setup failed, unexpected address type: %v", f.invalidated)
-			} else {
-				host := i2pAddr.String()
-				listenerURI = &url.URL{
-					Scheme: "onion",
-					Host:   host,
-				}
+			host := listener.Addr().String()
+			listenerURI = &url.URL{
+				Scheme: "onion",
+				Host:   host,
 			}
 		}
 	}
@@ -261,11 +245,6 @@ func (f *onionListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tls
 }
 
 func (f *onionListenerFactory) Valid(_ config.Configuration) error {
-	// Onion must not be nil
-	if f.Onion == nil {
-		return fmt.Errorf("Onion is nil, onionListenerFactory was not instantiated: %s", f.invalidated)
-	}
-	// Onion setup failed earlier and the transport was invalidated
 	if f.invalidated != nil {
 		return f.invalidated
 	}

@@ -37,7 +37,7 @@ type onionDialer struct {
 
 func (d *onionDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if d.onion == nil {
-		return nil, fmt.Errorf("onion dialer not initialized (SAM unavailable)")
+		return nil, fmt.Errorf("onion dialer not initialized (Tor unavailable)")
 	}
 	return d.onion.Dial(network, addr)
 }
@@ -46,8 +46,8 @@ func (d *onionDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.UR
 	if uri == nil {
 		return internalConn{}, fmt.Errorf("onion dialer: nil URI")
 	}
-	// For I2P, addresses are cryptographic hashes; we pass the full host
-	// (without port) to the SAM API. There is never a configured hostname.
+	// For Tor, onion addresses are hostnames; we pass the full host
+	// (without port) to the Tor client.
 	host := uri.Host
 	if colon := strings.LastIndex(host, ":"); colon != -1 {
 		host = host[:colon]
@@ -55,7 +55,7 @@ func (d *onionDialer) Dial(ctx context.Context, _ protocol.DeviceID, uri *url.UR
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, err := d.DialContext(timeoutCtx, "onion", host)
+	conn, err := d.DialContext(timeoutCtx, "tcp", host)
 	if err != nil {
 		return internalConn{}, err
 	}
