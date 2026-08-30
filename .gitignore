@@ -19,3 +19,5 @@ deb
 /proto/scripts/protoc-gen-gosyncthing
 /compat.json
 /lib/connections/i2pkeys/
+/lib/connections/onionkeys/
+/lib/connections/data-dir*/
