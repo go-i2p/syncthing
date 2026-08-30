@@ -1032,6 +1032,10 @@ func (s *service) NATType() string {
 
 func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, error) {
 	switch cfg.Options.I2PMode {
+	case "anon-only":
+		if !(strings.HasPrefix(uri.Scheme, "garlic") || strings.HasPrefix(uri.Scheme, "onion")) {
+			return nil, fmt.Errorf("%w: anon-only mode excludes %s", errDisabled, uri.Scheme)
+		}
 	case "i2p-only":
 		if !strings.HasPrefix(uri.Scheme, "garlic") {
 			return nil, fmt.Errorf("%w: I2P-only mode excludes %s", errDisabled, uri.Scheme)
@@ -1054,6 +1058,10 @@ func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, er
 
 func getListenerFactory(cfg config.Configuration, uri *url.URL) (listenerFactory, error) {
 	switch cfg.Options.I2PMode {
+	case "anon-only":
+		if !(strings.HasPrefix(uri.Scheme, "garlic") || strings.HasPrefix(uri.Scheme, "onion")) {
+			return nil, fmt.Errorf("%w: anon-only mode excludes %s", errDisabled, uri.Scheme)
+		}
 	case "i2p-only":
 		if !strings.HasPrefix(uri.Scheme, "garlic") {
 			return nil, fmt.Errorf("%w: I2P-only mode excludes %s", errDisabled, uri.Scheme)

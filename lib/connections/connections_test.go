@@ -501,3 +501,34 @@ func mustGetCert(b interface{ Fatal(...interface{}) }) tls.Certificate {
 	}
 	return cert
 }
+
+func TestAnonOnlyModeFiltersAddresses(t *testing.T) {
+	var err error
+	cfg := config.New(protocol.LocalDeviceID)
+	cfg.Options.I2PMode = "anon-only"
+
+	onionURI, _ := url.Parse("onion://test.onion:5678")
+	tcpURI, _ := url.Parse("tcp://1.2.3.4:5678")
+
+	// Onion should be allowed in anon-only mode
+	_, err = getDialerFactory(config.Configuration{Options: cfg.Options}, onionURI)
+	if err != nil {
+		t.Errorf("anon-only: onion dialer should be allowed, got error: %v", err)
+	}
+
+	// TCP should be excluded in anon-only mode
+	_, err = getDialerFactory(config.Configuration{Options: cfg.Options}, tcpURI)
+	if err == nil {
+		t.Errorf("anon-only: tcp dialer should be excluded, expected error")
+	}
+
+	_, err = getListenerFactory(config.Configuration{Options: cfg.Options}, onionURI)
+	if err != nil {
+		t.Errorf("anon-only: onion listener should be allowed, got error: %v", err)
+	}
+
+	_, err = getListenerFactory(config.Configuration{Options: cfg.Options}, tcpURI)
+	if err == nil {
+		t.Errorf("anon-only: tcp listener should be excluded, expected error")
+	}
+}

@@ -198,7 +198,7 @@ func (f *onionListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tls
 		f.Onion, err = onramp.NewOnion("syncthing-listen")
 		if err != nil {
 			f.invalidated = err
-			l.Debugf("SAMv3 connection to I2P failed: %s", err)
+			l.Debugf("Tor listener setup failed, cannot listen on onion: %s", err)
 			return &onionListener{
 				uri:      nil,
 				cfg:      cfg,
