@@ -79,9 +79,11 @@ type OptionsConfiguration struct {
 	ConnectionPriorityTCPLAN           int `json:"connectionPriorityTcpLan" xml:"connectionPriorityTcpLan" default:"10"`
 	ConnectionPriorityQUICLAN          int `json:"connectionPriorityQuicLan" xml:"connectionPriorityQuicLan" default:"20"`
 	ConnectionPriorityGarlicLAN        int `json:"connectionPriorityGarlicLan" xml:"connectionPriorityGarlicLan" default:"30"`
+	ConnectionPriorityOnionLAN         int `json:"connectionPriorityOnionLan" xml:"connectionPriorityOnionLan" default:"40"`
 	ConnectionPriorityTCPWAN           int `json:"connectionPriorityTcpWan" xml:"connectionPriorityTcpWan" default:"30"`
 	ConnectionPriorityQUICWAN          int `json:"connectionPriorityQuicWan" xml:"connectionPriorityQuicWan" default:"40"`
 	ConnectionPriorityGarlicWAN        int `json:"connectionPriorityGarlicWan" xml:"connectionPriorityGarlicWan" default:"50"`
+	ConnectionPriorityOnionWAN         int `json:"connectionPriorityOnionWan" xml:"connectionPriorityOnionWan" default:"60"`
 	ConnectionPriorityRelay            int `json:"connectionPriorityRelay" xml:"connectionPriorityRelay" default:"50"`
 	ConnectionPriorityUpgradeThreshold int `json:"connectionPriorityUpgradeThreshold" xml:"connectionPriorityUpgradeThreshold" default:"0"`
 	// I2P mode: "mixed" (TCP/QUIC + I2P), "i2p-only" (I2P only), or "disabled"

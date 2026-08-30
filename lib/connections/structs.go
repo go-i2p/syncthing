@@ -58,6 +58,8 @@ const (
 	connTypeQUICServer
 	connTypeGarlicClient
 	connTypeGarlicServer
+	connTypeOnionClient
+	connTypeOnionServer
 )
 
 func (t connType) String() string {
