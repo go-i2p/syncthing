@@ -80,6 +80,10 @@ func (t connType) String() string {
 		return "garlic-client"
 	case connTypeGarlicServer:
 		return "garlic-server"
+	case connTypeOnionClient:
+		return "onion-client"
+	case connTypeOnionServer:
+		return "onion-server"
 	default:
 		return "unknown-type"
 	}
@@ -95,6 +99,8 @@ func (t connType) Transport() string {
 		return "quic"
 	case connTypeGarlicClient, connTypeGarlicServer:
 		return "garlic"
+	case connTypeOnionClient, connTypeOnionServer:
+		return "onion"
 	default:
 		return "unknown"
 	}
