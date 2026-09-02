@@ -216,9 +216,10 @@ func (opts OptionsConfiguration) ListenAddresses() []string {
 				filtered = append(filtered, a)
 				continue
 			}
-			if !strings.HasPrefix(uri.Scheme, "garlic") {
-				filtered = append(filtered, a)
+			if strings.HasPrefix(uri.Scheme, "garlic") || strings.HasPrefix(uri.Scheme, "onion") {
+				continue
 			}
+			filtered = append(filtered, a)
 		}
 		addresses = filtered
 	case "anon-only":
