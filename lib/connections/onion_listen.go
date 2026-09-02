@@ -245,6 +245,9 @@ func (f *onionListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tls
 }
 
 func (f *onionListenerFactory) Valid(_ config.Configuration) error {
+	if f.Onion == nil {
+		return fmt.Errorf("Onion is nil, onionListenerFactory was not instantiated: %s", f.invalidated)
+	}
 	if f.invalidated != nil {
 		return f.invalidated
 	}

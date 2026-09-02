@@ -261,10 +261,6 @@ func (f *garlicListenerFactory) New(uri *url.URL, cfg config.Wrapper, tlsCfg *tl
 }
 
 func (f *garlicListenerFactory) Valid(_ config.Configuration) error {
-	// Garlic must not be nil
-	if f.Garlic == nil {
-		return fmt.Errorf("Garlic is nil, garlicListenerFactory was not instantiated: %s", f.invalidated)
-	}
 	// Garlic setup failed earlier and the transport was invalidated
 	if f.invalidated != nil {
 		return f.invalidated
