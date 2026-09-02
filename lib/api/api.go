@@ -1067,6 +1067,26 @@ func (s *service) getSystemStatus(w http.ResponseWriter, _ *http.Request) {
 	res["guiAddressOverridden"] = s.cfg.GUI().IsOverridden()
 	res["guiAddressUsed"] = s.listenerAddr.String()
 
+	// Transport availability feedback for I2P and Tor (WebUI confirmation)
+	listenerStatus := s.connectionsService.ListenerStatus()
+	i2pAvailable := false
+	torAvailable := false
+	for addr, status := range listenerStatus {
+		if status.Error == nil {
+			if strings.Contains(addr, "garlic") {
+				i2pAvailable = true
+			}
+			if strings.Contains(addr, "onion") {
+				torAvailable = true
+			}
+		}
+	}
+	res["transportStatus"] = map[string]interface{}{
+		"i2pMode":      s.cfg.Options().I2PMode,
+		"i2pAvailable": i2pAvailable,
+		"torAvailable": torAvailable,
+	}
+
 	sendJSON(w, res)
 }
 
