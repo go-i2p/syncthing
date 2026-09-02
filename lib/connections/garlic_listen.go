@@ -77,12 +77,14 @@ func (t *garlicListener) serve(ctx context.Context) error {
 	}
 	if i2pAddr, ok := addr.(*i2pkeys.I2PAddr); ok {
 		gaddr = *i2pAddr
+	} else if i2pAddrVal, ok := addr.(i2pkeys.I2PAddr); ok {
+		gaddr = i2pAddrVal
 	} else {
 		// Listener address may be a TCP wrapper; construct I2PAddr from host string
 		parsedAddr, parseErr := i2pkeys.NewI2PAddrFromString(addr.String())
 		if parseErr != nil {
 			slog.WarnContext(ctx, "Garlic listener address is not I2PAddr and cannot be parsed", slogutil.Address(addr))
-			return fmt.Errorf("garlic listener: unexpected address type %T", addr)
+			return fmt.Errorf("garlic listener: unexpected address type %T (value=%v)", addr, addr)
 		}
 		gaddr = parsedAddr
 	}
