@@ -1032,6 +1032,8 @@ func (s *service) NATType() string {
 
 func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, error) {
 	switch cfg.Options.I2PMode {
+	case "mixed":
+		// keep all schemes (default)
 	case "anon-only":
 		if !(strings.HasPrefix(uri.Scheme, "garlic") || strings.HasPrefix(uri.Scheme, "onion")) {
 			return nil, fmt.Errorf("%w: anon-only mode excludes %s", errDisabled, uri.Scheme)
@@ -1058,6 +1060,8 @@ func getDialerFactory(cfg config.Configuration, uri *url.URL) (dialerFactory, er
 
 func getListenerFactory(cfg config.Configuration, uri *url.URL) (listenerFactory, error) {
 	switch cfg.Options.I2PMode {
+	case "mixed":
+		// keep all schemes (default)
 	case "anon-only":
 		if !(strings.HasPrefix(uri.Scheme, "garlic") || strings.HasPrefix(uri.Scheme, "onion")) {
 			return nil, fmt.Errorf("%w: anon-only mode excludes %s", errDisabled, uri.Scheme)
@@ -1099,6 +1103,12 @@ func tlsTimedHandshake(tc *tls.Conn) error {
 // IsAllowedNetwork returns true if the given host (IP or resolvable
 // hostname) is in the set of allowed networks (CIDR format only).
 func IsAllowedNetwork(host string, allowed []string) bool {
+	// Cryptographic hash addresses (I2P garlic, Tor onion) have no valid
+	// hostname/IP for CIDR matching; allow them unconditionally.
+	if strings.Contains(host, ".i2p") || strings.HasSuffix(host, ".onion") || len(host) > 40 {
+		return true
+	}
+
 	if hostNoPort, _, err := net.SplitHostPort(host); err == nil {
 		host = hostNoPort
 	}
