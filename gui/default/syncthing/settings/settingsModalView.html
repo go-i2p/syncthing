@@ -277,6 +277,19 @@
             <div class="col-md-6">
             </div>
           </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label translate>I2P Mode</label>
+                <select class="form-control" ng-model="tmpOptions.i2pMode">
+                  <option value="mixed" translate>Mixed (I2P + Clearnet)</option>
+                  <option value="i2p-only" translate>I2P Only</option>
+                  <option value="anon-only" translate>Anon Only (I2P + Tor)</option>
+                  <option value="disabled" translate>Disabled</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div id="settings-ignored-devices" class="tab-pane">
